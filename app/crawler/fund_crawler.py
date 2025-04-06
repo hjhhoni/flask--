@@ -17,7 +17,7 @@ class FundCrawler:
         }
         # 使用ChromiumPage替代WebPage
         self.page = ChromiumPage()
-        self.max_items = 2000
+        self.max_items = 15000
         self.items_collected = 0
         
     def _convert_to_float(self, value):
@@ -55,7 +55,7 @@ class FundCrawler:
             funds_data = []
             
             # 循环翻页直到收集足够数据或超时
-            max_pages = 50  # 设置最大翻页次数
+            max_pages = 80  # 设置最大翻页次数
             current_page = 1
             
             while current_page <= max_pages and self.items_collected < self.max_items:
