@@ -103,6 +103,6 @@ CREATE TABLE IF NOT EXISTS funds (
 ```
 6. **运行项目**
 ```bash
-python app.py
+python run.py
 ```
 应用将在 http://127.0.0.1:5000/ 运行。
