@@ -11,14 +11,23 @@
             border-radius: 5px;
             padding: 15px;
             background-color: #f9f9f9;
-            height: 400px;
+            height: auto; /* 修改为auto，让容器高度自适应内容 */
+            min-height: 400px; /* 设置最小高度 */
             position: relative;
+            overflow: visible; /* 修改为visible，允许内容溢出 */
+            display: none; /* 默认隐藏所有图表 */
+        }
+        .chart-container.active {
+            display: block; /* 显示当前选中的图表 */
         }
         .header {
             background-color: #f8f9fa;
             padding: 20px 0;
             margin-bottom: 30px;
             border-bottom: 1px solid #e9ecef;
+        }
+        .chart-selector {
+            margin-bottom: 20px;
         }
     </style>
 </head>
@@ -47,40 +56,42 @@
             </div>
         </div>
         
+        <!-- 添加图表选择器 -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="chart-selector">
+                    <label for="chartSelect" class="form-label">选择要查看的图表：</label>
+                    <select id="chartSelect" class="form-select" onchange="switchChart()">
+                        <option value="topFundsChart">表现最佳基金</option>
+                        <option value="bottomFundsChart">表现最差基金</option>
+                        <option value="distributionChart">日增长率分布</option>
+                        <option value="netValueDistributionChart">最新净值分布</option>
+                        <option value="pieChart">基金类型分布</option>
+                        <option value="scatterChart">净值与日增长率关系</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 修改图表容器结构 -->
         <div class="row">
-            <div class="col-md-6">
-                <div class="chart-container">
+            <div class="col-md-12">
+                <div id="topFundsChartContainer" class="chart-container active">
                     <canvas id="topFundsChart"></canvas>
                 </div>
-            </div>
-            <div class="col-md-6">
-                <div class="chart-container">
+                <div id="bottomFundsChartContainer" class="chart-container">
                     <canvas id="bottomFundsChart"></canvas>
                 </div>
-            </div>
-        </div>
-        
-        <div class="row">
-            <div class="col-md-6">
-                <div class="chart-container">
+                <div id="distributionChartContainer" class="chart-container">
                     <canvas id="distributionChart"></canvas>
                 </div>
-            </div>
-            <div class="col-md-6">
-                <div class="chart-container">
+                <div id="netValueDistributionChartContainer" class="chart-container">
                     <canvas id="netValueDistributionChart"></canvas>
                 </div>
-            </div>
-        </div>
-        
-        <div class="row">
-            <div class="col-md-6">
-                <div class="chart-container">
+                <div id="pieChartContainer" class="chart-container">
                     <canvas id="pieChart"></canvas>
                 </div>
-            </div>
-            <div class="col-md-6">
-                <div class="chart-container">
+                <div id="scatterChartContainer" class="chart-container">
                     <canvas id="scatterChart"></canvas>
                 </div>
             </div>
@@ -96,6 +107,19 @@
     <script>
         // 图表对象
         let topFundsChart, bottomFundsChart, distributionChart, netValueDistributionChart, pieChart, scatterChart;
+        
+        // 切换图表显示
+        function switchChart() {
+            const selectedValue = document.getElementById('chartSelect').value;
+            
+            // 隐藏所有图表容器
+            document.querySelectorAll('.chart-container').forEach(container => {
+                container.classList.remove('active');
+            });
+            
+            // 显示选中的图表容器
+            document.getElementById(selectedValue + 'Container').classList.add('active');
+        }
         
         // 加载数据并绘制图表
         async function loadChartData() {
@@ -154,6 +178,9 @@
                 drawNetValueDistributionChart(data.net_value_distribution.values);
                 drawPieChart(data.pie_chart.labels, data.pie_chart.values);
                 drawScatterChart(data.scatter.net_values, data.scatter.growth_rates);
+                
+                // 恢复选中的图表显示
+                switchChart();
                 
                 console.log('所有图表绘制完成');
                 
@@ -313,6 +340,8 @@
                     }]
                 },
                 options: {
+                    responsive: true, // 确保图表响应式
+                    maintainAspectRatio: false, // 不维持固定宽高比，允许图表自适应容器
                     plugins: {
                         title: {
                             display: true,
