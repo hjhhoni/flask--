@@ -21,6 +21,18 @@ db_config = {
 # 修改这里，使用main_bp而不是app
 @main_bp.route('/')
 def index():
+    # 将根路由重定向到index页面
+    from flask import redirect, url_for
+    return redirect(url_for('main.login_page'))
+
+# 添加登录页面路由
+@main_bp.route('/index')
+def login_page():
+    return render_template('index.html')
+
+# 添加funds页面路由
+@main_bp.route('/funds')
+def funds_page():
     return render_template('funds.html')
 
 @main_bp.route('/api/funds')
@@ -698,4 +710,140 @@ def get_fund_detail(fund_code):
         if cursor:
             cursor.close()
         if conn:
+            conn.close()
+
+# 用户认证相关路由
+@main_bp.route('/api/register', methods=['POST'])
+def register():
+    try:
+        data = request.get_json()
+        
+        # 验证必要字段
+        required_fields = ['username', 'email', 'password']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'success': False, 'message': f'缺少必要字段: {field}'}), 400
+        
+        # 连接数据库
+        conn = pymysql.connect(**db_config)
+        cursor = conn.cursor()
+        
+        # 检查用户名是否已存在
+        cursor.execute("SELECT COUNT(*) FROM users WHERE username = %s", (data['username'],))
+        if cursor.fetchone()[0] > 0:
+            return jsonify({'success': False, 'message': '该用户名已被注册'}), 400
+        
+        # 检查邮箱是否已存在
+        cursor.execute("SELECT COUNT(*) FROM users WHERE email = %s", (data['email'],))
+        if cursor.fetchone()[0] > 0:
+            return jsonify({'success': False, 'message': '该邮箱已被注册'}), 400
+        
+        # 密码加密
+        import hashlib
+        password_hash = hashlib.sha256(data['password'].encode()).hexdigest()
+        
+        # 生成token
+        import uuid
+        token = str(uuid.uuid4())
+        
+        # 插入用户数据
+        sql = """INSERT INTO users (username, email, password_hash, token, created_at)
+                VALUES (%s, %s, %s, %s, NOW())"""
+        
+        cursor.execute(sql, (
+            data['username'],
+            data['email'],
+            password_hash,
+            token
+        ))
+        
+        conn.commit()
+        return jsonify({'success': True, 'message': '注册成功', 'token': token})
+    
+    except Exception as e:
+        if 'conn' in locals() and conn:
+            conn.rollback()
+        return jsonify({'success': False, 'message': f'注册失败: {str(e)}'}), 500
+    finally:
+        if 'cursor' in locals() and cursor:
+            cursor.close()
+        if 'conn' in locals() and conn:
+            conn.close()
+
+@main_bp.route('/api/login', methods=['POST'])
+def login():
+    try:
+        data = request.get_json()
+        
+        # 验证必要字段
+        required_fields = ['username', 'password']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'success': False, 'message': f'缺少必要字段: {field}'}), 400
+        
+        # 连接数据库
+        conn = pymysql.connect(**db_config)
+        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        
+        # 密码加密
+        import hashlib
+        password_hash = hashlib.sha256(data['password'].encode()).hexdigest()
+        
+        # 查询用户
+        sql = "SELECT * FROM users WHERE username = %s AND password_hash = %s"
+        cursor.execute(sql, (data['username'], password_hash))
+        user = cursor.fetchone()
+        
+        if not user:
+            return jsonify({'success': False, 'message': '用户名或密码错误'}), 401
+        
+        # 生成新token
+        import uuid
+        token = str(uuid.uuid4())
+        
+        # 更新token
+        update_sql = "UPDATE users SET token = %s, last_login = NOW() WHERE id = %s"
+        cursor.execute(update_sql, (token, user['id']))
+        
+        conn.commit()
+        return jsonify({'success': True, 'message': '登录成功', 'token': token})
+    
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'登录失败: {str(e)}'}), 500
+    finally:
+        if 'cursor' in locals() and cursor:
+            cursor.close()
+        if 'conn' in locals() and conn:
+            conn.close()
+
+@main_bp.route('/api/verify-token', methods=['POST'])
+def verify_token():
+    try:
+        # 获取Authorization头
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({'success': False, 'message': '无效的Authorization头'}), 401
+        
+        token = auth_header.split(' ')[1]
+        
+        # 连接数据库
+        conn = pymysql.connect(**db_config)
+        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        
+        # 查询token
+        sql = "SELECT * FROM users WHERE token = %s"
+        cursor.execute(sql, (token,))
+        user = cursor.fetchone()
+        
+        if not user:
+            return jsonify({'success': False, 'message': '无效的token'}), 401
+        
+        return jsonify({'success': True, 'message': 'token有效'})
+    
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'验证失败: {str(e)}'}), 500
+    finally:
+        if 'cursor' in locals() and cursor:
+            cursor.close()
+        if 'conn' in locals() and conn:
             conn.close()

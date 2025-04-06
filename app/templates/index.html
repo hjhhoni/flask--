@@ -1,23 +1,460 @@
-<div class="container">
-        <div class="row mb-4">
-            <div class="col-md-6">
-                <h2>基金列表</h2>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>基金数据分析系统 - 登录</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.bootcdn.net/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Microsoft YaHei', sans-serif;
+        }
+        .auth-container {
+            margin-top: 80px;
+            margin-bottom: 80px;
+        }
+        .auth-card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .auth-header {
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .auth-header h1 {
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        .auth-header p {
+            opacity: 0.8;
+            margin-bottom: 0;
+        }
+        .auth-body {
+            padding: 40px;
+        }
+        .nav-tabs {
+            border-bottom: none;
+            margin-bottom: 30px;
+        }
+        .nav-tabs .nav-link {
+            border: none;
+            font-weight: 600;
+            color: #495057;
+            padding: 10px 20px;
+            border-radius: 30px;
+            margin-right: 10px;
+        }
+        .nav-tabs .nav-link.active {
+            background-color: #6a11cb;
+            color: white;
+        }
+        .form-control {
+            border-radius: 8px;
+            padding: 12px 15px;
+            margin-bottom: 20px;
+            border: 1px solid #ced4da;
+        }
+        .form-control:focus {
+            box-shadow: 0 0 0 3px rgba(106, 17, 203, 0.2);
+            border-color: #6a11cb;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            border: none;
+            border-radius: 8px;
+            padding: 12px 20px;
+            font-weight: 600;
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            border: none;
+            border-radius: 8px;
+            padding: 12px 20px;
+            font-weight: 600;
+        }
+        .feature-card {
+            border-radius: 15px;
+            border: none;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s;
+            height: 100%;
+        }
+        .feature-card:hover {
+            transform: translateY(-5px);
+        }
+        .feature-icon {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            color: #6a11cb;
+        }
+        .footer {
+            background-color: #343a40;
+            color: white;
+            padding: 30px 0;
+            margin-top: 50px;
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark" style="background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-bar-chart-fill me-2"></i>基金数据分析系统
+            </a>
+        </div>
+    </nav>
+
+    <!-- 主要内容区域 -->
+    <div class="container auth-container">
+        <div class="row">
+            <!-- 左侧登录/注册卡片 -->
+            <div class="col-lg-6">
+                <div class="auth-card">
+                    <div class="auth-header">
+                        <h1><i class="bi bi-shield-lock"></i> 用户登录</h1>
+                        <p>登录您的账户以访问基金数据分析系统</p>
+                    </div>
+                    <div class="auth-body">
+                        <ul class="nav nav-tabs" id="auth-tabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="login-tab" data-bs-toggle="tab" data-bs-target="#login-form" type="button" role="tab" aria-controls="login-form" aria-selected="true">
+                                    <i class="bi bi-box-arrow-in-right me-2"></i>登录
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="register-tab" data-bs-toggle="tab" data-bs-target="#register-form" type="button" role="tab" aria-controls="register-form" aria-selected="false">
+                                    <i class="bi bi-person-plus me-2"></i>注册
+                                </button>
+                            </li>
+                        </ul>
+                        
+                        <div class="tab-content" id="auth-tabs-content">
+                            <!-- 登录表单 -->
+                            <div class="tab-pane fade show active" id="login-form" role="tabpanel" aria-labelledby="login-tab">
+                                <form id="login-form-element">
+                                    <div class="mb-3">
+                                        <label for="login-username" class="form-label">
+                                            <i class="bi bi-person me-2"></i>用户名
+                                        </label>
+                                        <input type="text" class="form-control" id="login-username" placeholder="请输入您的用户名" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="login-password" class="form-label">
+                                            <i class="bi bi-key me-2"></i>密码
+                                        </label>
+                                        <input type="password" class="form-control" id="login-password" placeholder="请输入您的密码" required>
+                                    </div>
+                                    <div class="mb-4 form-check">
+                                        <input type="checkbox" class="form-check-input" id="remember-me">
+                                        <label class="form-check-label" for="remember-me">记住我</label>
+                                    </div>
+                                    <div class="d-grid">
+                                        <button type="submit" class="btn btn-primary btn-lg">
+                                            <i class="bi bi-box-arrow-in-right me-2"></i>登录
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                            
+                            <!-- 注册表单 -->
+                            <div class="tab-pane fade" id="register-form" role="tabpanel" aria-labelledby="register-tab">
+                                <form id="register-form-element">
+                                    <div class="mb-3">
+                                        <label for="register-username" class="form-label">
+                                            <i class="bi bi-person me-2"></i>用户名
+                                        </label>
+                                        <input type="text" class="form-control" id="register-username" placeholder="请创建您的用户名" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="register-email" class="form-label">
+                                            <i class="bi bi-envelope me-2"></i>电子邮箱
+                                        </label>
+                                        <input type="email" class="form-control" id="register-email" placeholder="请输入您的电子邮箱" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="register-password" class="form-label">
+                                            <i class="bi bi-key me-2"></i>密码
+                                        </label>
+                                        <input type="password" class="form-control" id="register-password" placeholder="请创建您的密码" required>
+                                    </div>
+                                    <div class="mb-4">
+                                        <label for="register-confirm-password" class="form-label">
+                                            <i class="bi bi-key-fill me-2"></i>确认密码
+                                        </label>
+                                        <input type="password" class="form-control" id="register-confirm-password" placeholder="请再次输入您的密码" required>
+                                    </div>
+                                    <div class="d-grid">
+                                        <button type="submit" class="btn btn-success btn-lg">
+                                            <i class="bi bi-person-plus me-2"></i>注册
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="col-md-6 text-end">
-                <a href="/analysis" class="btn btn-primary">查看分析图表</a>
-                <a href="/dashboard" class="btn btn-info">查看可视化大屏</a>
-                <button class="btn btn-success" onclick="refreshData()">刷新数据</button>
+            
+            <!-- 右侧系统特点介绍 -->
+            <div class="col-lg-6">
+                <h2 class="mb-4 text-center">系统特点</h2>
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="card feature-card p-4">
+                            <div class="text-center">
+                                <i class="bi bi-graph-up-arrow feature-icon"></i>
+                                <h5>实时数据分析</h5>
+                                <p class="text-muted">提供最新的基金数据分析，帮助您做出明智的投资决策。</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card feature-card p-4">
+                            <div class="text-center">
+                                <i class="bi bi-bar-chart-fill feature-icon"></i>
+                                <h5>可视化图表</h5>
+                                <p class="text-muted">直观的图表展示，让您轻松了解基金走势和市场动态。</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mt-4">
+                        <div class="card feature-card p-4">
+                            <div class="text-center">
+                                <i class="bi bi-lightning-charge feature-icon"></i>
+                                <h5>趋势预测</h5>
+                                <p class="text-muted">基于AI算法的趋势预测，帮助您把握投资机会。</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mt-4">
+                        <div class="card feature-card p-4">
+                            <div class="text-center">
+                                <i class="bi bi-shield-check feature-icon"></i>
+                                <h5>安全可靠</h5>
+                                <p class="text-muted">数据安全加密存储，保障您的账户和投资信息安全。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-        <div class="row mb-4">
-            <div class="col-md-6">
-                <a href="/analysis" class="btn btn-primary btn-lg w-100">
-                    <i class="bi bi-bar-chart-fill"></i> 查看数据分析
+    </div>
+
+    <!-- 主要内容区域 - 登录后显示 -->
+    <div class="container" id="main-content" style="display: none;">
+        <div class="row mb-5">
+            <div class="col-12 text-center mb-4">
+                <h2>欢迎使用基金数据分析系统</h2>
+                <p class="lead">请选择您需要的功能</p>
+            </div>
+            <div class="col-md-4">
+                <a href="/funds" class="text-decoration-none">
+                    <div class="card feature-card p-4">
+                        <div class="text-center">
+                            <i class="bi bi-list-ul feature-icon"></i>
+                            <h4>基金列表</h4>
+                            <p class="text-muted">查看和管理您的基金数据</p>
+                        </div>
+                    </div>
                 </a>
             </div>
-            <div class="col-md-6">
-                <a href="/prediction" class="btn btn-success btn-lg w-100">
-                    <i class="bi bi-graph-up"></i> 查看趋势预测
+            <div class="col-md-4">
+                <a href="/analysis" class="text-decoration-none">
+                    <div class="card feature-card p-4">
+                        <div class="text-center">
+                            <i class="bi bi-bar-chart-fill feature-icon"></i>
+                            <h4>数据分析</h4>
+                            <p class="text-muted">查看详细的基金分析图表</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-4">
+                <a href="/prediction" class="text-decoration-none">
+                    <div class="card feature-card p-4">
+                        <div class="text-center">
+                            <i class="bi bi-graph-up feature-icon"></i>
+                            <h4>趋势预测</h4>
+                            <p class="text-muted">查看基金未来走势预测</p>
+                        </div>
+                    </div>
                 </a>
             </div>
         </div>
+    </div>
+
+    <!-- 页脚 -->
+    <footer class="footer">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>基金数据分析系统</h5>
+                    <p>为您提供专业的基金数据分析和投资决策支持</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p>&copy; 2025 基金数据分析系统. 保留所有权利.</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript 脚本 -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 检查用户是否已登录
+            checkLoginStatus();
+            
+            // 登录表单提交
+            document.getElementById('login-form-element').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const username = document.getElementById('login-username').value;
+                const password = document.getElementById('login-password').value;
+                const rememberMe = document.getElementById('remember-me').checked;
+                
+                // 发送登录请求
+                fetch('/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        password: password,
+                        remember_me: rememberMe
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // 登录成功
+                        localStorage.setItem('user', JSON.stringify({
+                            username: username,
+                            token: data.token
+                        }));
+                        // 重定向到funds页面
+                        window.location.href = '/funds';
+                    } else {
+                        // 登录失败
+                        alert('登录失败: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('登录请求失败:', error);
+                    alert('登录请求失败，请稍后再试');
+                });
+            });
+            
+            // 注册表单提交
+            document.getElementById('register-form-element').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const username = document.getElementById('register-username').value;
+                const email = document.getElementById('register-email').value;
+                const password = document.getElementById('register-password').value;
+                const confirmPassword = document.getElementById('register-confirm-password').value;
+                
+                // 验证密码是否匹配
+                if (password !== confirmPassword) {
+                    alert('两次输入的密码不匹配');
+                    return;
+                }
+                
+                // 发送注册请求
+                fetch('/api/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        email: email,
+                        password: password
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // 注册成功，自动登录
+                        localStorage.setItem('user', JSON.stringify({
+                            username: username,
+                            token: data.token
+                        }));
+                        alert('注册成功！');
+                        // 重定向到funds页面
+                        window.location.href = '/funds';
+                    } else {
+                        // 注册失败
+                        alert('注册失败: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('注册请求失败:', error);
+                    alert('注册请求失败，请稍后再试');
+                });
+            });
+        });
+        
+        // 检查用户是否已登录
+        function checkLoginStatus() {
+            const user = JSON.parse(localStorage.getItem('user') || 'null');
+            
+            if (user && user.token) {
+                // 验证token是否有效
+                fetch('/api/verify-token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${user.token}`
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Token有效，重定向到funds页面
+                        window.location.href = '/funds';
+                    } else {
+                        // Token无效，显示登录表单
+                        localStorage.removeItem('user');
+                        showAuthForm();
+                    }
+                })
+                .catch(error => {
+                    console.error('验证token失败:', error);
+                    showAuthForm();
+                });
+            } else {
+                // 未登录，显示登录表单
+                showAuthForm();
+            }
+        }
+        
+        // 显示主内容
+        function showMainContent() {
+            document.querySelector('.auth-container').style.display = 'none';
+            document.getElementById('main-content').style.display = 'block';
+            
+            // 显示用户信息
+            const user = JSON.parse(localStorage.getItem('user'));
+            if (user) {
+                // 这里可以添加显示用户名的代码
+                console.log('当前登录用户:', user.username);
+            }
+        }
+        
+        // 显示登录/注册表单
+        function showAuthForm() {
+            document.querySelector('.auth-container').style.display = 'block';
+            document.getElementById('main-content').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
