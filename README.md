@@ -43,5 +43,66 @@
 1. **克隆项目**
 
 ```bash
-git clone https://github.com/your-username/fund-project.git
+git clone https://github.com/hjhhoni/fund-project.git
 cd fund-project
+```
+2. **创建并激活虚拟环境**
+
+```bash
+python -m venv venv
+venv\Scripts\activate
+```
+
+3. **安装依赖**
+```bash
+pip install -r requirements.txt
+```
+
+4. **配置数据库**
+创建MySQL数据库并修改 config.py 文件中的数据库连接信息：
+```python
+class Config:
+    SECRET_KEY = 'your-secret-key'
+    # 数据库配置
+    MYSQL_HOST = 'localhost'
+    MYSQL_USER = 'root'
+    MYSQL_PASSWORD = 'your-password'
+    MYSQL_DB = 'fund_db'
+    MYSQL_PORT = 3306
+
+```
+
+5.**初始化数据库**
+```sql
+CREATE TABLE IF NOT EXISTS users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    email VARCHAR(100) NOT NULL UNIQUE,
+    password_hash VARCHAR(64) NOT NULL,
+    token VARCHAR(36),
+    created_at DATETIME NOT NULL,
+    last_login DATETIME,
+    INDEX (username),
+    INDEX (email),
+    INDEX (token)
+);
+
+CREATE TABLE IF NOT EXISTS funds (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    fund_code VARCHAR(10) NOT NULL UNIQUE,
+    fund_name VARCHAR(100) NOT NULL,
+    latest_net_value DECIMAL(10,4) NOT NULL,
+    latest_total_value DECIMAL(10,4),
+    daily_growth_value DECIMAL(10,4),
+    daily_growth_rate DECIMAL(10,4),
+    latest_date DATE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX (fund_code)
+);
+```
+6. **运行项目**
+```bash
+python app.py
+```
+应用将在 http://127.0.0.1:5000/ 运行。
