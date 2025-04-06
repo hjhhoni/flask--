@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>基金数据可视化大屏</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.bootcdn.net/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        body {
+            background-color: #0f1c2e;
+            color: #fff;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+        .dashboard-header {
+            background-color: #1a2942;
+            padding: 15px 0;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #2a3f5f;
+        }
+        .chart-container {
+            margin-bottom: 20px;
+            border: 1px solid #2a3f5f;
+            border-radius: 5px;
+            padding: 15px;
+            background-color: #1a2942;
+            height: 350px;
+            position: relative;
+        }
+        .data-card {
+            background-color: #1a2942;
+            border-radius: 5px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #2a3f5f;
+            text-align: center;
+        }
+        .data-card h3 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            color: #8e9eab;
+        }
+        .data-card .value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #4ecdc4;
+        }
+        .data-card .trend {
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        .trend-up {
+            color: #4ecdc4;
+        }
+        .trend-down {
+            color: #ff6b6b;
+        }
+        .refresh-btn {
+            background-color: #4ecdc4;
+            border: none;
+        }
+        .refresh-btn:hover {
+            background-color: #2ab7a9;
+        }
+        footer {
+            background-color: #1a2942;
+            border-top: 1px solid #2a3f5f;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-header">
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-md-6">
+                    <h2>基金数据可视化大屏</h2>
+                </div>
+                <div class="col-md-6 text-end">
+                    <a href="/" class="btn btn-outline-light">返回基金列表</a>
+                    <a href="/analysis" class="btn btn-outline-light">返回分析页面</a>
+                    <button class="btn refresh-btn" onclick="refreshData()">刷新数据</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-fluid">
+        <!-- 数据卡片 -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="data-card">
+                    <h3>基金总数</h3>
+                    <div class="value" id="totalFunds">--</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="data-card">
+                    <h3>平均净值</h3>
+                    <div class="value" id="avgNetValue">--</div>
+                    <div class="trend" id="avgNetValueTrend"></div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="data-card">
+                    <h3>平均日增长率</h3>
+                    <div class="value" id="avgGrowthRate">--</div>
+                    <div class="trend" id="avgGrowthRateTrend"></div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="data-card">
+                    <h3>上涨基金比例</h3>
+                    <div class="value" id="upRatio">--</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 图表区域 -->
+        <div class="row">
+            <div class="col-md-8">
+                <div class="chart-container">
+                    <canvas id="trendChart"></canvas>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="chart-container">
+                    <canvas id="typeDistributionChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <canvas id="topPerformersChart"></canvas>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <canvas id="growthDistributionChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-12">
+                <div class="chart-container">
+                    <canvas id="marketOverviewChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="py-4 mt-5">
+        <div class="container-fluid text-center">
+            <p class="text-muted">基金数据可视化大屏 &copy; {{ now.year }}</p>
+        </div>
+    </footer>
+
+    <script>
+        // 图表对象
+        let trendChart, typeDistributionChart, topPerformersChart, growthDistributionChart, marketOverviewChart;
+        
+        // 加载数据并绘制图表
+        async function loadDashboardData() {
+            try {
+                // 显示加载状态
+                document.querySelectorAll('.chart-container').forEach(container => {
+                    container.innerHTML = `<div class="text-center mt-5"><div class="spinner-border text-info" role="status"></div><p class="mt-2">加载数据中...</p></div>`;
+                });
+                
+                console.log('开始从API获取数据...');
+                // 从API获取数据
+                const response = await fetch('/api/dashboard-data');
+                console.log('API响应状态:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('获取到的数据:', data);
+                
+                if (data.error) {
+                    console.error('获取数据出错:', data.error);
+                    document.querySelectorAll('.chart-container').forEach(container => {
+                        container.innerHTML = `<div class="alert alert-danger">获取数据失败: ${data.error}</div>`;
+                    });
+                    return;
+                }
+                
+                // 更新数据卡片
+                updateDataCards(data.summary);
+                
+                // 获取所有图表容器
+                const chartContainers = document.querySelectorAll('.chart-container');
+                
+                // 重新创建canvas元素
+                chartContainers[0].innerHTML = '<canvas id="trendChart"></canvas>';
+                chartContainers[1].innerHTML = '<canvas id="typeDistributionChart"></canvas>';
+                chartContainers[2].innerHTML = '<canvas id="topPerformersChart"></canvas>';
+                chartContainers[3].innerHTML = '<canvas id="growthDistributionChart"></canvas>';
+                chartContainers[4].innerHTML = '<canvas id="marketOverviewChart"></canvas>';
+                
+                // 绘制图表
+                drawTrendChart(data.trend_data);
+                drawTypeDistributionChart(data.type_distribution);
+                drawTopPerformersChart(data.top_performers);
+                drawGrowthDistributionChart(data.growth_distribution);
+                drawMarketOverviewChart(data.market_overview);
+                
+                console.log('所有图表绘制完成');
+                
+            } catch (error) {
+                console.error('获取图表数据失败:', error);
+                document.querySelectorAll('.chart-container').forEach(container => {
+                    container.innerHTML = `<div class="alert alert-danger">获取数据失败: ${error.message}</div>`;
+                });
+            }
+        }
+        
+        // 更新数据卡片
+        function updateDataCards(summary) {
+            document.getElementById('totalFunds').textContent = summary.total_funds;
+            document.getElementById('avgNetValue').textContent = summary.avg_net_value.toFixed(4);
+            document.getElementById('avgGrowthRate').textContent = summary.avg_growth_rate.toFixed(2) + '%';
+            document.getElementById('upRatio').textContent = summary.up_ratio.toFixed(2) + '%';
+            
+            // 设置趋势
+            const avgNetValueTrend = document.getElementById('avgNetValueTrend');
+            if (summary.avg_net_value_change > 0) {
+                avgNetValueTrend.innerHTML = `<i class="bi bi-arrow-up"></i> +${summary.avg_net_value_change.toFixed(4)}`;
+                avgNetValueTrend.className = 'trend trend-up';
+            } else {
+                avgNetValueTrend.innerHTML = `<i class="bi bi-arrow-down"></i> ${summary.avg_net_value_change.toFixed(4)}`;
+                avgNetValueTrend.className = 'trend trend-down';
+            }
+            
+            const avgGrowthRateTrend = document.getElementById('avgGrowthRateTrend');
+            if (summary.avg_growth_rate_change > 0) {
+                avgGrowthRateTrend.innerHTML = `<i class="bi bi-arrow-up"></i> +${summary.avg_growth_rate_change.toFixed(2)}%`;
+                avgGrowthRateTrend.className = 'trend trend-up';
+            } else {
+                avgGrowthRateTrend.innerHTML = `<i class="bi bi-arrow-down"></i> ${summary.avg_growth_rate_change.toFixed(2)}%`;
+                avgGrowthRateTrend.className = 'trend trend-down';
+            }
+        }
+        
+        // 绘制趋势图
+        function drawTrendChart(trendData) {
+            const ctx = document.getElementById('trendChart').getContext('2d');
+            
+            // 销毁旧图表
+            if (trendChart) {
+                trendChart.destroy();
+            }
+            
+            trendChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: trendData.dates,
+                    datasets: [{
+                        label: '平均净值',
+                        data: trendData.avg_net_values,
+                        borderColor: '#4ecdc4',
+                        backgroundColor: 'rgba(78, 205, 196, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    }, {
+                        label: '平均日增长率',
+                        data: trendData.avg_growth_rates,
+                        borderColor: '#ff6b6b',
+                        backgroundColor: 'rgba(255, 107, 107, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        yAxisID: 'y1'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '基金市场趋势',
+                            color: '#fff'
+                        },
+                        legend: {
+                            labels: {
+                                color: '#fff'
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: '#8e9eab'
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: '#8e9eab'
+                            },
+                            title: {
+                                display: true,
+                                text: '平均净值',
+                                color: '#8e9eab'
+                            }
+                        },
+                        y1: {
+                            position: 'right',
+                            grid: {
+                                drawOnChartArea: false
+                            },
+                            ticks: {
+                                color: '#8e9eab'
+                            },
+                            title: {
+                                display: true,
+                                text: '平均日增长率 (%)',
+                                color: '#8e9eab'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 绘制基金类型分布图
+        function drawTypeDistributionChart(typeData) {
+            const ctx = document.getElementById('typeDistributionChart').getContext('2d');
+            
+            // 销毁旧图表
+            if (typeDistributionChart) {
+                typeDistributionChart.destroy();
+            }
+            
+            typeDistributionChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: typeData.labels,
+                    datasets: [{
+                        data: typeData.values,
+                        backgroundColor: [
+                            'rgba(78, 205, 196, 0.7)',
+                            'rgba(255, 107, 107, 0.7)',
+                            'rgba(255, 230, 109, 0.7)',
+                            'rgba(85, 239, 196, 0.7)',
+                            'rgba(129, 236, 236, 0.7)',
+                            'rgba(116, 185, 255, 0.7)'
+                        ],
+                        borderColor: '#1a2942',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '基金类型分布',
+                            color: '#fff'
+                        },
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                color: '#fff',
+                                boxWidth: 15,
+                                padding: 10
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 绘制表现最佳基金图表
+        function drawTopPerformersChart(topData) {
+            const ctx = document.getElementById('topPerformersChart').getContext('2d');
+            
+            // 销毁旧图表
+            if (topPerformersChart) {
+                topPerformersChart.destroy();
+            }
+            
+            topPerformersChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: topData.names,
+                    datasets: [{
+                        label: '日增长率 (%)',
+                        data: topData.rates,
+                        backgroundColor: 'rgba(78, 205, 196, 0.7)',
+                        borderColor: 'rgba(78, 205, 196, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '表现最佳基金',
+                            color: '#fff'
+                        },
+                        legend: {
+                            labels: {
+                                color: '#fff'
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: '#8e9eab'
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: '#8e9eab'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 绘制增长率分布图
+        function drawGrowthDistributionChart(distributionData) {
+            const ctx = document.getElementById('growthDistributionChart').getContext('2d');
+            
+            // 销毁旧图表
+            if (growthDistributionChart) {
+                growthDistributionChart.destroy();
+            }
+            
+            growthDistributionChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: distributionData.labels,
+                    datasets: [{
+                        label: '基金数量',
+                        data: distributionData.values,
+                        backgroundColor: 'rgba(255, 107, 107, 0.7)',
+                        borderColor: 'rgba(255, 107, 107, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '日增长率分布',
+                            color: '#fff'
+                        },
+                        legend: {
+                            labels: {
+                                color: '#fff'
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: '#8e9eab',
+                                display: false
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: '#8e9eab'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 绘制市场概览图
+        function drawMarketOverviewChart(marketData) {
+            const ctx = document.getElementById('marketOverviewChart').getContext('2d');
+            
+            // 销毁旧图表
+            if (marketOverviewChart) {
+                marketOverviewChart.destroy();
+            }
+            
+            marketOverviewChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: marketData.dates,
+                    datasets: marketData.datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '市场指数与基金表现对比',
+                            color: '#fff'
+                        },
+                        legend: {
+                            labels: {
+                                color: '#fff'
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: '#8e9eab'
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: '#8e9eab'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 刷新数据
+        function refreshData() {
+            loadDashboardData();
+        }
+        
+        // 页面加载时获取数据
+        document.addEventListener('DOMContentLoaded', function() {
+            loadDashboardData();
+        });
+    </script>
+</body>
+</html>

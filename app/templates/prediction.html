@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>基金趋势预测</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.bootcdn.net/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        .chart-container {
+            margin-bottom: 30px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            height: 400px;
+            position: relative;
+        }
+        .header {
+            background-color: #f8f9fa;
+            padding: 20px 0;
+            margin-bottom: 30px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .prediction-card {
+            margin-bottom: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .prediction-card .card-header {
+            font-weight: bold;
+        }
+        .prediction-positive {
+            background-color: rgba(153, 204, 153, 0.2);
+            border-left: 4px solid #5cb85c;
+        }
+        .prediction-negative {
+            background-color: rgba(255, 153, 153, 0.2);
+            border-left: 4px solid #d9534f;
+        }
+        .prediction-neutral {
+            background-color: rgba(102, 179, 255, 0.2);
+            border-left: 4px solid #5bc0de;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <h2>基金趋势预测</h2>
+                </div>
+                <div class="col-md-6 text-end">
+                    <a href="/" class="btn btn-primary">返回基金列表</a>
+                    <a href="/analysis" class="btn btn-info">查看数据分析</a>
+                    <button class="btn btn-success" onclick="refreshPredictions()">刷新预测</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="alert alert-info">
+                    <p>本页面展示了基金未来趋势的预测结果，帮助您做出更明智的投资决策。</p>
+                    <p><strong>注意：</strong>预测结果仅供参考，不构成投资建议。投资有风险，决策需谨慎。</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 添加预测时间范围导航栏 -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h4>预测时间范围</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="btn-group w-100" role="group" aria-label="预测时间范围">
+                            <button type="button" class="btn btn-outline-primary prediction-range-btn active" data-range="3">三天</button>
+                            <button type="button" class="btn btn-outline-primary prediction-range-btn" data-range="7">一周</button>
+                            <button type="button" class="btn btn-outline-primary prediction-range-btn" data-range="30">一个月</button>
+                            <button type="button" class="btn btn-outline-primary prediction-range-btn" data-range="180">半年</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h4>市场趋势预测</h4>
+                    </div>
+                    <div class="card-body">
+                        <div id="marketTrendSummary" class="mb-3">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">加载中...</span>
+                            </div>
+                            <span>正在分析市场趋势...</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="marketTrendChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <canvas id="topPredictedFundsChart"></canvas>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <canvas id="fundTypePredictionChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <canvas id="confidenceDistributionChart"></canvas>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <canvas id="predictionTimelineChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h4>推荐基金</h4>
+                    </div>
+                    <div class="card-body">
+                        <div id="recommendationContainer">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">加载中...</span>
+                            </div>
+                            <span>正在生成推荐...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-light py-4 mt-5">
+        <div class="container text-center">
+            <p class="text-muted">基金数据分析系统 &copy; {{ now.year }}</p>
+        </div>
+    </footer>
+
+    <script>
+        // 图表对象
+        let marketTrendChart, topPredictedFundsChart, fundTypePredictionChart, confidenceDistributionChart, predictionTimelineChart;
+        
+        // 当前选择的预测时间范围（默认为3天）
+        let currentPredictionRange = 3;
+        
+        // 加载预测数据并绘制图表
+        async function loadPredictionData() {
+            try {
+                // 从API获取预测数据，传递预测时间范围
+                const response = await fetch(`/api/predictions?range=${currentPredictionRange}`);
+                const data = await response.json();
+                
+                if (!data.predictions || data.predictions.length === 0) {
+                    console.error('没有获取到预测数据');
+                    document.getElementById('marketTrendSummary').innerHTML = '<div class="alert alert-warning">暂无预测数据可用</div>';
+                    document.getElementById('recommendationContainer').innerHTML = '<div class="alert alert-warning">暂无推荐基金</div>';
+                    return;
+                }
+                
+                const predictions = data.predictions;
+                
+                // 更新市场趋势摘要
+                updateMarketTrendSummary(predictions);
+                
+                // 绘制市场趋势图表
+                drawMarketTrendChart(predictions.marketTrend);
+                
+                // 绘制预测表现最佳基金图表
+                drawTopPredictedFundsChart(predictions.topFunds);
+                
+                // 绘制基金类型预测图表
+                drawFundTypePredictionChart(predictions.fundTypePredictions);
+                
+                // 绘制预测置信度分布图
+                drawConfidenceDistributionChart(predictions.confidenceDistribution);
+                
+                // 绘制预测时间线图表
+                drawPredictionTimelineChart(predictions.timelinePrediction);
+                
+                // 更新推荐基金
+                updateRecommendations(predictions.recommendations);
+                
+            } catch (error) {
+                console.error('获取预测数据失败:', error);
+                document.getElementById('marketTrendSummary').innerHTML = '<div class="alert alert-danger">获取预测数据失败</div>';
+                document.getElementById('recommendationContainer').innerHTML = '<div class="alert alert-danger">获取推荐基金失败</div>';
+            }
+        }
+        
+        // 更新市场趋势摘要
+        function updateMarketTrendSummary(predictions) {
+            const trend = predictions.marketTrend.overallTrend;
+            const confidence = predictions.marketTrend.confidence;
+            
+            let trendClass = '';
+            let trendIcon = '';
+            
+            if (trend === 'up') {
+                trendClass = 'text-success';
+                trendIcon = '↑';
+            } else if (trend === 'down') {
+                trendClass = 'text-danger';
+                trendIcon = '↓';
+            } else {
+                trendClass = 'text-info';
+                trendIcon = '→';
+            }
+            
+            // 根据当前选择的预测时间范围更新文本
+            let timeRangeText = '';
+            if (currentPredictionRange === 3) {
+                timeRangeText = '未来三天';
+            } else if (currentPredictionRange === 7) {
+                timeRangeText = '未来一周';
+            } else if (currentPredictionRange === 30) {
+                timeRangeText = '未来一个月';
+            } else if (currentPredictionRange === 180) {
+                timeRangeText = '未来半年';
+            }
+            
+            const summaryHTML = `
+                <div class="alert alert-light">
+                    <h5>${timeRangeText}市场趋势预测：<span class="${trendClass}"><strong>${trendIcon} ${getTrendText(trend)}</strong></span></h5>
+                    <div class="progress mb-2">
+                        <div class="progress-bar bg-${trend === 'up' ? 'success' : trend === 'down' ? 'danger' : 'info'}" 
+                             role="progressbar" style="width: ${confidence}%" 
+                             aria-valuenow="${confidence}" aria-valuemin="0" aria-valuemax="100">
+                            ${confidence}%
+                        </div>
+                    </div>
+                    <p>预测置信度：${confidence}%</p>
+                    <p>${predictions.marketTrend.summary}</p>
+                </div>
+            `;
+            
+            document.getElementById('marketTrendSummary').innerHTML = summaryHTML;
+        }
+        
+        // 获取趋势文本描述
+        function getTrendText(trend) {
+            switch(trend) {
+                case 'up': return '上涨';
+                case 'down': return '下跌';
+                case 'stable': return '稳定';
+                default: return '未知';
+            }
+        }
+        
+        // 绘制市场趋势图表
+        function drawMarketTrendChart(marketTrend) {
+            const ctx = document.getElementById('marketTrendChart').getContext('2d');
+            
+            // 销毁旧图表
+            if (marketTrendChart) {
+                marketTrendChart.destroy();
+            }
+            
+            // 准备数据
+            const labels = marketTrend.timeline.map(item => item.date);
+            const actualData = marketTrend.timeline.map(item => item.actual);
+            const predictedData = marketTrend.timeline.map(item => item.predicted);
+            
+            marketTrendChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '历史数据',
+                            data: actualData,
+                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 2,
+                            pointRadius: 3,
+                            fill: false
+                        },
+                        {
+                            label: '预测趋势',
+                            data: predictedData,
+                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            pointRadius: 3,
+                            fill: false
+                        }
+                    ]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '市场指数趋势预测'
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: '日期'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: '指数值'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 绘制预测表现最佳基金图表
+        function drawTopPredictedFundsChart(topFunds) {
+            const ctx = document.getElementById('topPredictedFundsChart').getContext('2d');
+            
+            // 销毁旧图表
+            if (topPredictedFundsChart) {
+                topPredictedFundsChart.destroy();
+            }
+            
+            // 准备数据
+            const labels = topFunds.map(f => f.fund_name);
+            const data = topFunds.map(f => f.predicted_growth);
+            
+            topPredictedFundsChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '预测增长率 (%)',
+                        data: data,
+                        backgroundColor: data.map(val => val > 0 ? 'rgba(75, 192, 192, 0.7)' : 'rgba(255, 99, 132, 0.7)'),
+                        borderColor: data.map(val => val > 0 ? 'rgba(75, 192, 192, 1)' : 'rgba(255, 99, 132, 1)'),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '预测表现最佳基金'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const fund = topFunds[context.dataIndex];
+                                    return `代码: ${fund.fund_code}, 预测增长率: ${context.raw}%, 置信度: ${fund.confidence}%`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: '预测增长率 (%)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 绘制基金类型预测图表
+        function drawFundTypePredictionChart(fundTypePredictions) {
+            const ctx = document.getElementById('fundTypePredictionChart').getContext('2d');
+            
+            // 销毁旧图表
+            if (fundTypePredictionChart) {
+                fundTypePredictionChart.destroy();
+            }
+            
+            // 准备数据
+            const labels = Object.keys(fundTypePredictions);
+            const data = Object.values(fundTypePredictions).map(item => item.predicted_growth);
+            
+            // 为不同类型设置不同颜色
+            const backgroundColors = [
+                'rgba(102, 179, 255, 0.7)',
+                'rgba(255, 153, 153, 0.7)',
+                'rgba(153, 204, 153, 0.7)',
+                'rgba(255, 204, 102, 0.7)',
+                'rgba(204, 153, 204, 0.7)',
+                'rgba(102, 204, 204, 0.7)',
+                'rgba(192, 192, 192, 0.7)'
+            ];
+            
+            const borderColors = [
+                'rgba(102, 179, 255, 1)',
+                'rgba(255, 153, 153, 1)',
+                'rgba(153, 204, 153, 1)',
+                'rgba(255, 204, 102, 1)',
+                'rgba(204, 153, 204, 1)',
+                'rgba(102, 204, 204, 1)',
+                'rgba(192, 192, 192, 1)'
+            ];
+            
+            fundTypePredictionChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '预测增长率 (%)',
+                        data: data,
+                        backgroundColor: backgroundColors.slice(0, labels.length),
+                        borderColor: borderColors.slice(0, labels.length),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '基金类型预测增长率'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const type = context.label;
+                                    const prediction = Object.values(fundTypePredictions)[context.dataIndex];
+                                    return `预测增长率: ${prediction.predicted_growth}%, 置信度: ${prediction.confidence}%`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            title: {
+                                display: true,
+                                text: '预测增长率 (%)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 绘制预测置信度分布图
+        function drawConfidenceDistributionChart(confidenceDistribution) {
+            const ctx = document.getElementById('confidenceDistributionChart').getContext('2d');
+            
+            // 销毁旧图表
+            if (confidenceDistributionChart) {
+                confidenceDistributionChart.destroy();
+            }
+            
+            // 准备数据
+            const labels = Object.keys(confidenceDistribution);
+            const data = Object.values(confidenceDistribution);
+            
+            confidenceDistributionChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '基金数量',
+                        data: data,
+                        backgroundColor: 'rgba(153, 102, 255, 0.7)',
+                        borderColor: 'rgba(153, 102, 255, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '预测置信度分布'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: '基金数量'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: '置信度区间 (%)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 绘制预测时间线图表
+        function drawPredictionTimelineChart(timelinePrediction) {
+            const ctx = document.getElementById('predictionTimelineChart').getContext('2d');
+            
+            // 销毁旧图表
+            if (predictionTimelineChart) {
+                predictionTimelineChart.destroy();
+            }
+            
+            // 准备数据
+            const labels = timelinePrediction.map(item => item.date);
+            const optimisticData = timelinePrediction.map(item => item.optimistic);
+            const pessimisticData = timelinePrediction.map(item => item.pessimistic);
+            const baselineData = timelinePrediction.map(item => item.baseline);
+            
+            predictionTimelineChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '乐观预测',
+                            data: optimisticData,
+                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            borderWidth: 2,
+                            fill: false
+                        },
+                        {
+                            label: '基准预测',
+                            data: baselineData,
+                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 2,
+                            fill: false
+                        },
+                        {
+                            label: '悲观预测',
+                            data: pessimisticData,
+                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            borderWidth: 2,
+                            fill: false
+                        }
+                    ]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '未来30天市场预测'
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: '日期'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: '预测指数'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 更新推荐基金
+        function updateRecommendations(recommendations) {
+            const container = document.getElementById('recommendationContainer');
+            
+            if (!recommendations || recommendations.length === 0) {
+                container.innerHTML = '<div class="alert alert-warning">暂无推荐基金</div>';
+                return;
+            }
+            
+            let html = '<div class="row">';
+            
+            recommendations.forEach(rec => {
+                let cardClass = '';
+                if (rec.prediction_type === 'positive') {
+                    cardClass = 'prediction-positive';
+                } else if (rec.prediction_type === 'negative') {
+                    cardClass = 'prediction-negative';
+                } else {
+                    cardClass = 'prediction-neutral';
+                }
+                
+                html += `
+                    <div class="col-md-4 mb-3">
+                        <div class="card prediction-card ${cardClass}">
+                            <div class="card-header">
+                                ${rec.fund_name} (${rec.fund_code})
+                            </div>
+                            <div class="card-body">
+                                <h5 class="card-title">预测增长率: ${rec.predicted_growth}%</h5>
+                                <p class="card-text">
+                                    <strong>置信度:</strong> ${rec.confidence}%<br>
+                                    <strong>推荐理由:</strong> ${rec.recommendation_reason}<br>
+                                    <strong>风险等级:</strong> ${rec.risk_level}
+                                </p>
+                                <a href="/fund/${rec.fund_code}" class="btn btn-primary btn-sm">查看详情</a>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+        
+        // 切换预测时间范围
+        function changePredictionRange(range) {
+            currentPredictionRange = range;
+            loadPredictionData();
+        }
+        
+        // 刷新预测数据
+        function refreshPredictions() {
+            loadPredictionData();
+        }
+        
+        // 页面加载时获取数据
+        document.addEventListener('DOMContentLoaded', function() {
+            // 加载初始数据
+            loadPredictionData();
+            
+            // 为预测时间范围按钮添加点击事件
+            document.querySelectorAll('.prediction-range-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    // 移除所有按钮的active类
+                    document.querySelectorAll('.prediction-range-btn').forEach(b => {
+                        b.classList.remove('active');
+                    });
+                    
+                    // 为当前点击的按钮添加active类
+                    this.classList.add('active');
+                    
+                    // 获取并设置新的预测时间范围
+                    const range = parseInt(this.getAttribute('data-range'));
+                    changePredictionRange(range);
+                });
+            });
+        });
+    </script>
+</body>
+</html>
