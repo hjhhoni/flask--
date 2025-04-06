@@ -3,6 +3,7 @@
 <head>
     <title>基金数据</title>
     <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.bootcdn.net/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         .header {
             background-color: #f8f9fa;
@@ -20,6 +21,10 @@
                     <h2>基金数据查询</h2>
                 </div>
                 <div class="col-md-6 text-end">
+                    <!-- 添加新增基金按钮 -->
+                    <button class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#addFundModal">
+                        <i class="bi bi-plus-circle"></i> 新增基金
+                    </button>
                     <a href="/analysis" class="btn btn-info me-2">
                         <i class="bi bi-bar-chart-fill"></i> 数据分析
                     </a>
@@ -123,6 +128,7 @@
                             <th>日增长值</th>
                             <th>日增长率</th>
                             <th>更新日期</th>
+                            <th>操作</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -138,6 +144,14 @@
                         <td>${fund.daily_growth_value}</td>
                         <td>${fund.daily_growth_rate}%</td>
                         <td>${fund.latest_date}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" onclick="openEditModal('${fund.fund_code}')">
+                                <i class="bi bi-pencil"></i> 编辑
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="openDeleteModal('${fund.fund_code}', '${fund.fund_name}')">
+                                <i class="bi bi-trash"></i> 删除
+                            </button>
+                        </td>
                     </tr>
                 `;
             });
@@ -148,6 +162,283 @@
             `;
             
             document.getElementById('fundTable').innerHTML = tableHtml;
+        }
+    </script>
+
+
+    <!-- 新增基金模态框 -->
+    <div class="modal fade" id="addFundModal" tabindex="-1" aria-labelledby="addFundModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addFundModalLabel">新增基金</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addFundForm">
+                        <div class="mb-3">
+                            <label for="fundCode" class="form-label">基金代码</label>
+                            <input type="text" class="form-control" id="fundCode" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="fundName" class="form-label">基金名称</label>
+                            <input type="text" class="form-control" id="fundName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="netValue" class="form-label">最新净值</label>
+                            <input type="number" step="0.0001" class="form-control" id="netValue" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="totalValue" class="form-label">累计净值</label>
+                            <input type="number" step="0.0001" class="form-control" id="totalValue" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="growthValue" class="form-label">日增长值</label>
+                            <input type="number" step="0.0001" class="form-control" id="growthValue" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="growthRate" class="form-label">日增长率(%)</label>
+                            <input type="number" step="0.01" class="form-control" id="growthRate" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="updateDate" class="form-label">更新日期</label>
+                            <input type="date" class="form-control" id="updateDate" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="addFund()">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑基金模态框 -->
+    <div class="modal fade" id="editFundModal" tabindex="-1" aria-labelledby="editFundModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editFundModalLabel">编辑基金</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editFundForm">
+                        <input type="hidden" id="editFundId">
+                        <div class="mb-3">
+                            <label for="editFundCode" class="form-label">基金代码</label>
+                            <input type="text" class="form-control" id="editFundCode" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editFundName" class="form-label">基金名称</label>
+                            <input type="text" class="form-control" id="editFundName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editNetValue" class="form-label">最新净值</label>
+                            <input type="number" step="0.0001" class="form-control" id="editNetValue" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editTotalValue" class="form-label">累计净值</label>
+                            <input type="number" step="0.0001" class="form-control" id="editTotalValue" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editGrowthValue" class="form-label">日增长值</label>
+                            <input type="number" step="0.0001" class="form-control" id="editGrowthValue" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editGrowthRate" class="form-label">日增长率(%)</label>
+                            <input type="number" step="0.01" class="form-control" id="editGrowthRate" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editUpdateDate" class="form-label">更新日期</label>
+                            <input type="date" class="form-control" id="editUpdateDate" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="updateFund()">保存修改</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 删除确认模态框 -->
+    <div class="modal fade" id="deleteFundModal" tabindex="-1" aria-labelledby="deleteFundModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteFundModalLabel">确认删除</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>确定要删除基金 <span id="deleteFundName"></span> (<span id="deleteFundCode"></span>) 吗？</p>
+                    <p class="text-danger">此操作不可撤销！</p>
+                    <input type="hidden" id="deleteFundId">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-danger" onclick="confirmDeleteFund()">确认删除</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 添加基金
+        function addFund() {
+            const fundData = {
+                fund_code: document.getElementById('fundCode').value,
+                fund_name: document.getElementById('fundName').value,
+                latest_net_value: parseFloat(document.getElementById('netValue').value),
+                latest_total_value: parseFloat(document.getElementById('totalValue').value),
+                daily_growth_value: parseFloat(document.getElementById('growthValue').value),
+                daily_growth_rate: parseFloat(document.getElementById('growthRate').value),
+                latest_date: document.getElementById('updateDate').value
+            };
+            
+            fetch('/api/funds', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(fundData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('基金添加成功');
+                    // 关闭模态框
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('addFundModal'));
+                    modal.hide();
+                    // 重置表单
+                    document.getElementById('addFundForm').reset();
+                    // 刷新数据
+                    fetchFunds();
+                } else {
+                    alert('添加失败: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('添加基金失败:', error);
+                alert('添加基金失败，请稍后再试');
+            });
+        }
+
+        // 打开编辑模态框
+        function openEditModal(fundCode) {
+            // 获取基金详情
+            fetch(`/api/funds/${fundCode}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.fund) {
+                        const fund = data.fund;
+                        document.getElementById('editFundCode').value = fund.fund_code;
+                        document.getElementById('editFundName').value = fund.fund_name;
+                        document.getElementById('editNetValue').value = fund.latest_net_value;
+                        document.getElementById('editTotalValue').value = fund.latest_total_value;
+                        document.getElementById('editGrowthValue').value = fund.daily_growth_value;
+                        document.getElementById('editGrowthRate').value = fund.daily_growth_rate;
+                        document.getElementById('editUpdateDate').value = fund.latest_date;
+                        
+                        // 打开模态框
+                        const modal = new bootstrap.Modal(document.getElementById('editFundModal'));
+                        modal.show();
+                    } else {
+                        alert('获取基金详情失败: ' + (data.message || '未知错误'));
+                    }
+                })
+                .catch(error => {
+                    console.error('获取基金详情失败:', error);
+                    alert('获取基金详情失败，请稍后再试');
+                });
+        }
+
+        // 更新基金
+        function updateFund() {
+            const fundCode = document.getElementById('editFundCode').value;
+            const fundData = {
+                fund_name: document.getElementById('editFundName').value,
+                latest_net_value: parseFloat(document.getElementById('editNetValue').value),
+                latest_total_value: parseFloat(document.getElementById('editTotalValue').value),
+                daily_growth_value: parseFloat(document.getElementById('editGrowthValue').value),
+                daily_growth_rate: parseFloat(document.getElementById('editGrowthRate').value),
+                latest_date: document.getElementById('editUpdateDate').value
+            };
+            
+            fetch(`/api/funds/${fundCode}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(fundData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('基金更新成功');
+                    // 关闭模态框
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('editFundModal'));
+                    modal.hide();
+                    // 刷新数据
+                    fetchFunds();
+                } else {
+                    alert('更新失败: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('更新基金失败:', error);
+                alert('更新基金失败，请稍后再试');
+            });
+        }
+
+        // 打开删除确认模态框
+        function openDeleteModal(fundCode, fundName) {
+            document.getElementById('deleteFundCode').textContent = fundCode;
+            document.getElementById('deleteFundName').textContent = fundName;
+            document.getElementById('deleteFundId').value = fundCode;
+            
+            const modal = new bootstrap.Modal(document.getElementById('deleteFundModal'));
+            modal.show();
+        }
+
+        // 确认删除基金
+        function confirmDeleteFund() {
+            const fundCode = document.getElementById('deleteFundId').value;
+            
+            console.log('正在删除基金，代码:', fundCode);
+            
+            fetch(`/api/funds/${fundCode}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => {
+                console.log('删除请求状态码:', response.status);
+                if (!response.ok) {
+                    throw new Error(`HTTP错误! 状态: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('删除响应数据:', data);
+                if (data.success) {
+                    alert('基金删除成功');
+                    // 关闭模态框
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('deleteFundModal'));
+                    modal.hide();
+                    // 刷新数据
+                    fetchFunds();
+                } else {
+                    alert('删除失败: ' + (data.message || '未知错误'));
+                }
+            })
+            .catch(error => {
+                console.error('删除基金失败:', error);
+                alert('删除基金失败: ' + error.message);
+            });
         }
     </script>
 </body>

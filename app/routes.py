@@ -1,10 +1,13 @@
-from flask import render_template, request, jsonify, Flask, current_app
+from flask import render_template, request, jsonify, Flask, current_app, Blueprint
 from datetime import datetime
 import pymysql
 import pandas as pd  # 添加pandas导入
 from config import Config
 from app.crawler.fund_crawler import FundCrawler
 from app.analysis.fund_analyzer import FundAnalyzer
+
+# 创建蓝图
+main_bp = Blueprint('main', __name__)
 
 # Database configuration
 db_config = {
@@ -15,10 +18,12 @@ db_config = {
     'charset': 'utf8mb4'
 }
 
-# 修改这里，使用current_app而不是app
+# 修改这里，使用main_bp而不是app
+@main_bp.route('/')
 def index():
     return render_template('funds.html')
 
+@main_bp.route('/api/funds')
 def get_funds():
     search = request.args.get('search', '')
     
@@ -46,6 +51,7 @@ def get_funds():
         if conn:
             conn.close()
 
+@main_bp.route('/api/update')
 def update_funds():
     try:
         crawler = FundCrawler()
@@ -59,11 +65,14 @@ def update_funds():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@main_bp.route('/analysis')
 def analysis():
     return render_template('analysis.html', now=datetime.now())
 
+@main_bp.route('/api/chart-data')
 def get_chart_data():
     """获取图表数据的API端点"""
+    # 函数内容保持不变
     conn = None
     cursor = None
     try:
@@ -137,15 +146,13 @@ def get_chart_data():
         if conn:
             conn.close()
 
-# 修改这里，删除装饰器，只保留函数定义
+@main_bp.route('/prediction')
 def prediction():
     """显示基金预测页面"""
     now = datetime.now()
     return render_template('prediction.html', now=now)
 
-# 删除重复的get_chart_data函数
-
-# 修复get_predictions函数中的问题
+@main_bp.route('/api/predictions')
 def get_predictions():
     """获取基金预测数据的API"""
     try:
@@ -389,13 +396,14 @@ from app.models import Fund
 from flask import render_template, jsonify
 
 # 然后添加新的路由
-@app.route('/dashboard')
+# 修改这里，使用main_bp而不是app
+@main_bp.route('/dashboard')
 def dashboard():
     """可视化大屏页面"""
     now = datetime.now()
     return render_template('dashboard.html', now=now)
 
-@app.route('/api/dashboard-data')
+@main_bp.route('/api/dashboard-data')
 def get_dashboard_data():
     """获取可视化大屏数据"""
     try:
@@ -529,3 +537,165 @@ def get_dashboard_data():
         
     except Exception as e:
         return jsonify({'error': str(e)})
+
+# 添加新基金
+@main_bp.route('/api/funds', methods=['POST'])
+def add_fund():
+    try:
+        data = request.get_json()
+        
+        # 验证必要字段
+        required_fields = ['fund_code', 'fund_name', 'latest_net_value', 'latest_total_value', 
+                          'daily_growth_value', 'daily_growth_rate', 'latest_date']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'success': False, 'message': f'缺少必要字段: {field}'}), 400
+        
+        # 连接数据库
+        conn = pymysql.connect(**db_config)
+        cursor = conn.cursor()
+        
+        # 检查基金代码是否已存在
+        cursor.execute("SELECT COUNT(*) FROM funds WHERE fund_code = %s", (data['fund_code'],))
+        if cursor.fetchone()[0] > 0:
+            return jsonify({'success': False, 'message': '该基金代码已存在'}), 400
+        
+        # 准备插入数据
+        sql = """INSERT INTO funds (fund_code, fund_name, latest_net_value, latest_total_value,
+                daily_growth_value, daily_growth_rate, latest_date)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)"""
+        
+        cursor.execute(sql, (
+            data['fund_code'],
+            data['fund_name'],
+            data['latest_net_value'],
+            data['latest_total_value'],
+            data['daily_growth_value'],
+            data['daily_growth_rate'],
+            data['latest_date']
+        ))
+        
+        conn.commit()
+        return jsonify({'success': True, 'message': '基金添加成功'})
+    
+    except Exception as e:
+        if 'conn' in locals() and conn:
+            conn.rollback()
+        return jsonify({'success': False, 'message': f'添加基金失败: {str(e)}'}), 500
+    finally:
+        if 'cursor' in locals() and cursor:
+            cursor.close()
+        if 'conn' in locals() and conn:
+            conn.close()
+
+# 更新基金信息
+@main_bp.route('/api/funds/<fund_code>', methods=['PUT'])
+def update_fund(fund_code):
+    try:
+        data = request.get_json()
+        
+        # 验证必要字段
+        required_fields = ['fund_name', 'latest_net_value', 'latest_total_value', 
+                          'daily_growth_value', 'daily_growth_rate', 'latest_date']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'success': False, 'message': f'缺少必要字段: {field}'}), 400
+        
+        # 连接数据库
+        conn = pymysql.connect(**db_config)
+        cursor = conn.cursor()
+        
+        # 检查基金是否存在
+        cursor.execute("SELECT COUNT(*) FROM funds WHERE fund_code = %s", (fund_code,))
+        if cursor.fetchone()[0] == 0:
+            return jsonify({'success': False, 'message': '未找到该基金'}), 404
+        
+        # 准备更新数据
+        sql = """UPDATE funds SET 
+                fund_name = %s,
+                latest_net_value = %s,
+                latest_total_value = %s,
+                daily_growth_value = %s,
+                daily_growth_rate = %s,
+                latest_date = %s
+                WHERE fund_code = %s"""
+        
+        cursor.execute(sql, (
+            data['fund_name'],
+            data['latest_net_value'],
+            data['latest_total_value'],
+            data['daily_growth_value'],
+            data['daily_growth_rate'],
+            data['latest_date'],
+            fund_code
+        ))
+        
+        conn.commit()
+        return jsonify({'success': True, 'message': '基金更新成功'})
+    
+    except Exception as e:
+        if 'conn' in locals() and conn:
+            conn.rollback()
+        return jsonify({'success': False, 'message': f'更新基金失败: {str(e)}'}), 500
+    finally:
+        if 'cursor' in locals() and cursor:
+            cursor.close()
+        if 'conn' in locals() and conn:
+            conn.close()
+
+# 删除基金
+@main_bp.route('/api/funds/<fund_code>', methods=['DELETE'])
+def delete_fund(fund_code):
+    try:
+        # 连接数据库
+        conn = pymysql.connect(**db_config)
+        cursor = conn.cursor()
+        
+        # 检查基金是否存在
+        cursor.execute("SELECT COUNT(*) FROM funds WHERE fund_code = %s", (fund_code,))
+        if cursor.fetchone()[0] == 0:
+            return jsonify({'success': False, 'message': '未找到该基金'}), 404
+        
+        # 删除基金
+        sql = "DELETE FROM funds WHERE fund_code = %s"
+        cursor.execute(sql, (fund_code,))
+        
+        conn.commit()
+        return jsonify({'success': True, 'message': '基金删除成功'})
+    
+    except Exception as e:
+        if 'conn' in locals() and conn:
+            conn.rollback()
+        return jsonify({'success': False, 'message': f'删除基金失败: {str(e)}'}), 500
+    finally:
+        if 'cursor' in locals() and cursor:
+            cursor.close()
+        if 'conn' in locals() and conn:
+            conn.close()
+
+# 获取单个基金详情
+@main_bp.route('/api/funds/<fund_code>')
+def get_fund_detail(fund_code):
+    try:
+        conn = pymysql.connect(**db_config)
+        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        
+        sql = "SELECT * FROM funds WHERE fund_code = %s"
+        cursor.execute(sql, (fund_code,))
+        fund = cursor.fetchone()
+        
+        if not fund:
+            return jsonify({'success': False, 'message': '未找到该基金'}), 404
+        
+        # 处理日期格式，确保可以被JSON序列化
+        if 'latest_date' in fund and fund['latest_date']:
+            fund['latest_date'] = fund['latest_date'].strftime('%Y-%m-%d')
+            
+        return jsonify({'success': True, 'fund': fund})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
