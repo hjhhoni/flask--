@@ -49,7 +49,7 @@
 1. **克隆项目**
 
 ```bash
-git clone https://github.com/hjhhoni/fund-project.git
+git clone https://github.com/hjhhoni/eastmoney_spider.git
 cd fund-project
 ```
 2. **创建并激活虚拟环境**
