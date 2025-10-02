@@ -1,10 +1,11 @@
-from flask import render_template, request, jsonify, Flask, current_app, Blueprint
+from flask import render_template, request, jsonify, Flask, current_app, Blueprint, send_file
 from datetime import datetime
 import pymysql
 import pandas as pd  # 添加pandas导入
 from config import Config
 from app.crawler.fund_crawler import FundCrawler
 from app.analysis.fund_analyzer import FundAnalyzer
+import os
 
 # 创建蓝图
 main_bp = Blueprint('main', __name__)
@@ -49,7 +50,7 @@ def get_funds():
                     ORDER BY daily_growth_rate DESC"""
             cursor.execute(sql, (f'%{search}%', f'%{search}%'))
         else:
-            sql = "SELECT * FROM funds ORDER BY daily_growth_rate DESC LIMIT 100"
+            sql = "SELECT * FROM funds ORDER BY daily_growth_rate DESC LIMIT 10000"
             cursor.execute(sql)
             
         funds = cursor.fetchall()
@@ -63,11 +64,15 @@ def get_funds():
         if conn:
             conn.close()
 
-@main_bp.route('/api/update')
+@main_bp.route('/api/update', methods=['GET', 'POST'])
 def update_funds():
     try:
+        # 获取前端传递的参数
+        max_items = request.args.get('max_items', default=15000, type=int)
+        max_pages = request.args.get('max_pages', default=1, type=int)
+        
         crawler = FundCrawler()
-        funds_data = crawler.crawl_funds()
+        funds_data = crawler.crawl_funds(max_items=max_items, max_pages=max_pages)
         
         if funds_data:
             crawler.save_to_db(funds_data)
@@ -846,4 +851,114 @@ def verify_token():
         if 'cursor' in locals() and cursor:
             cursor.close()
         if 'conn' in locals() and conn:
+            conn.close()
+
+# 在routes.py文件中添加批量删除API接口
+@main_bp.route('/api/funds/batch-delete', methods=['POST'])
+def batch_delete_funds():
+    try:
+        data = request.get_json()
+        
+        if not data or 'fund_codes' not in data or not data['fund_codes']:
+            return jsonify({'success': False, 'message': '未提供要删除的基金代码'}), 400
+            
+        fund_codes = data['fund_codes']
+        
+        conn = pymysql.connect(**db_config)
+        cursor = conn.cursor()
+        
+        # 构建IN查询的参数
+        placeholders = ', '.join(['%s'] * len(fund_codes))
+        sql = f"DELETE FROM funds WHERE fund_code IN ({placeholders})"
+        
+        cursor.execute(sql, fund_codes)
+        deleted_count = cursor.rowcount
+        conn.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': f'成功删除 {deleted_count} 个基金',
+            'deleted_count': deleted_count
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'删除失败: {str(e)}'}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+@main_bp.route('/api/funds/export-csv')
+def export_funds_csv():
+    try:
+        conn = pymysql.connect(**db_config)
+        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        
+        # 获取所有基金数据
+        sql = "SELECT * FROM funds ORDER BY fund_code"
+        cursor.execute(sql)
+        funds = cursor.fetchall()
+        
+        if not funds:
+            return jsonify({'error': '没有可导出的数据'}), 404
+        
+        # 创建DataFrame
+        df = pd.DataFrame(funds)
+        
+        # 创建临时文件
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f'fund_data_{timestamp}.csv'
+        export_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'exports')
+        os.makedirs(export_path, exist_ok=True)
+        filepath = os.path.join(export_path, filename)
+        
+        # 导出为CSV
+        df.to_csv(filepath, index=False, encoding='utf-8-sig')
+        
+        # 返回文件
+        return send_file(
+            filepath,
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name=filename
+        )
+        
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())  # 打印详细错误信息到控制台
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+@main_bp.route('/api/funds/delete-all', methods=['DELETE'])
+def delete_all_funds():
+    conn = None
+    cursor = None
+    try:
+        conn = pymysql.connect(**db_config)
+        cursor = conn.cursor()
+        
+        # 先获取记录数量
+        count_sql = "SELECT COUNT(*) FROM funds"
+        cursor.execute(count_sql)
+        count = cursor.fetchone()[0]
+        
+        # 执行删除操作
+        sql = "DELETE FROM funds"
+        cursor.execute(sql)
+        conn.commit()
+        
+        return jsonify({'success': True, 'message': '所有基金数据已删除', 'count': count})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({'success': False, 'message': f'删除失败: {str(e)}'}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
             conn.close()

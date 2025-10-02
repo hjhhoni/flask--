@@ -5,6 +5,8 @@ import time
 from datetime import datetime
 import logging
 from config import Config
+import pandas as pd
+import os
 
 class FundCrawler:
     def __init__(self):
@@ -19,6 +21,9 @@ class FundCrawler:
         self.page = ChromiumPage()
         self.max_items = 15000
         self.items_collected = 0
+        # 创建CSV导出目录
+        self.export_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'exports')
+        os.makedirs(self.export_dir, exist_ok=True)
         
     def _convert_to_float(self, value):
         """将字符串转换为浮点数"""
@@ -40,11 +45,19 @@ class FundCrawler:
         except ValueError:
             return False
             
-    def crawl_funds(self):
+    def crawl_funds(self, max_items=None, max_pages=None):
         try:
             # 设置超时时间，避免任务执行时间过长
             start_time = time.time()
             max_execution_time = 180  # 最大执行时间180秒
+            
+            # 如果传入了参数，则使用传入的参数
+            if max_items is not None:
+                self.max_items = int(max_items)
+            if max_pages is not None:
+                max_pages = int(max_pages)
+            else:
+                max_pages = 1  # 默认值
             
             url = 'https://fund.eastmoney.com/fund.html#os_0;isall_0;ft_;pt_1'
             self.page.get(url)
@@ -55,7 +68,6 @@ class FundCrawler:
             funds_data = []
             
             # 循环翻页直到收集足够数据或超时
-            max_pages = 80  # 设置最大翻页次数
             current_page = 1
             
             while current_page <= max_pages and self.items_collected < self.max_items:
@@ -85,7 +97,7 @@ class FundCrawler:
                     logging.info(f"获取到响应数据长度: {len(response) if response else 0}")
                     
                     # 使用正则提取所有基金数据
-                    obj = re.compile(r'\["(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)".*?\]', re.S)
+                    obj = re.compile(r'\["(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)",.*?"(.*?)".*?\]', re.S)
                     results = obj.findall(response)
                     
                     logging.info(f"第 {current_page} 页提取到基金数据数量: {len(results)}")
@@ -101,7 +113,7 @@ class FundCrawler:
                             break
                         
                         # 检查数据长度是否足够
-                        if len(fund) < 23:
+                        if len(fund) < 21:
                             logging.warning(f"基金数据格式不完整，跳过: 索引 {i}, 长度 {len(fund)}")
                             continue
                             
@@ -115,15 +127,22 @@ class FundCrawler:
                                 'history_total_value': self._convert_to_float(fund[6]),
                                 'daily_growth_value': self._convert_to_float(fund[7]),
                                 'daily_growth_rate': self._convert_to_float(fund[8]),
-                                'latest_date': datetime.now().strftime('%Y-%m-%d'),  # 默认使用当前日期
-                                'history_date': datetime.now().strftime('%Y-%m-%d')  # 默认使用当前日期
+                                'latest_date': None,  # 先设为None，后面会根据实际数据更新
+                                'history_date': None  # 先设为None，后面会根据实际数据更新
                             }
                             
                             # 安全地获取日期字段
                             if len(fund) > 21 and self._is_valid_date(fund[21]):
                                 fund_data['latest_date'] = fund[21]
+                            else:
+                                # 如果没有有效日期，才使用当前日期作为备选
+                                fund_data['latest_date'] = datetime.now().strftime('%Y-%m-%d')
+                                
                             if len(fund) > 22 and self._is_valid_date(fund[22]):
                                 fund_data['history_date'] = fund[22]
+                            else:
+                                # 如果没有有效日期，才使用当前日期作为备选
+                                fund_data['history_date'] = datetime.now().strftime('%Y-%m-%d')
                                 
                             funds_data.append(fund_data)
                             self.items_collected += 1
@@ -166,6 +185,32 @@ class FundCrawler:
                 pass
             self.page.quit()
 
+    def export_to_csv(self, funds_data):
+        """将爬取的基金数据导出为CSV文件"""
+        try:
+            if not funds_data:
+                logging.warning("没有数据可导出")
+                return None
+                
+            # 创建DataFrame
+            df = pd.DataFrame(funds_data)
+            
+            # 生成文件名，包含当前日期时间
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f'fund_data_{timestamp}.csv'
+            filepath = os.path.join(self.export_dir, filename)
+            
+            # 导出为CSV
+            df.to_csv(filepath, index=False, encoding='utf-8-sig')
+            logging.info(f"成功导出CSV文件: {filepath}")
+            
+            return filepath
+        except Exception as e:
+            logging.error(f"导出CSV失败: {str(e)}")
+            import traceback
+            logging.error(traceback.format_exc())
+            return None
+
     def save_to_db(self, funds_data):
         try:
             conn = pymysql.connect(**self.db_config)
@@ -190,6 +235,9 @@ class FundCrawler:
                     
             cursor.executemany(sql, funds_data)
             conn.commit()
+            
+            # 导出CSV文件
+            self.export_to_csv(funds_data)
             
         except Exception as e:
             logging.error(f"保存数据失败: {str(e)}")
