@@ -73,7 +73,7 @@ class Config:
     MYSQL_HOST = 'localhost'
     MYSQL_USER = 'root'
     MYSQL_PASSWORD = 'your-password'
-    MYSQL_DB = 'fund_db'
+    MYSQL_DB = 'flask'
     MYSQL_PORT = 3306
 
 ```
